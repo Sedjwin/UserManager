@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, LogOut, ShieldCheck, X, Save, Loader } from 'lucide-react'
+import { Plus, Pencil, Trash2, ShieldCheck, X, Save, Loader } from 'lucide-react'
 import { listUsers, createUser, updateUser, deleteUser } from './api.js'
+import UserPill from './UserPill.jsx'
 
 const ROLES = ['demo', 'free', 'paid', 'admin']
 const ROLE_COLOURS = { admin: 'text-amber-400', paid: 'text-green-400', free: 'text-blue-400', demo: 'text-gray-400' }
@@ -119,7 +120,6 @@ export default function Users({ currentUser, onLogout }) {
           <ShieldCheck className="text-blue-400" size={24} />
           <div>
             <h1 className="text-lg font-semibold text-gray-100">UserManager</h1>
-            <p className="text-xs text-gray-500">Signed in as <span className={ROLE_COLOURS[currentUser.role]}>{currentUser.username} ({currentUser.role})</span></p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -131,9 +131,7 @@ export default function Users({ currentUser, onLogout }) {
               <Plus size={16} /> New user
             </button>
           )}
-          <button onClick={onLogout} className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 px-3 py-2 transition-colors">
-            <LogOut size={16} /> Sign out
-          </button>
+          <UserPill user={currentUser} onLogout={onLogout} />
         </div>
       </div>
 
