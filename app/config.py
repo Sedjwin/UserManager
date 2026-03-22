@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str = "changeme"
 
+    # Used by other services (AgentManager etc.) to create/delete agent principals
+    service_key: str = "change-me-service-key"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

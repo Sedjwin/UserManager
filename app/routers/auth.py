@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,14 +18,6 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 _bearer = HTTPBearer(auto_error=False)
 
-
-class LoginRequest:
-    def __init__(self, username: str, password: str):
-        self.username = username
-        self.password = password
-
-
-from pydantic import BaseModel
 
 class LoginBody(BaseModel):
     username: str
@@ -46,30 +39,61 @@ async def login(body: LoginBody, db: AsyncSession = Depends(get_db)):
         user_id=user.id,
         username=user.username,
         role=user.role,
+        principal_type=user.principal_type,
     )
 
 
 @router.get("/validate", response_model=ValidateResponse)
 async def validate_token(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Called by other services to verify a JWT and get user identity.
+    Called by other services to verify a JWT or API key and get principal identity.
     Returns valid=false on any error rather than raising — callers decide how to handle.
+    Accepts both short-lived JWTs (humans) and long-lived API keys (agents).
     """
     if not creds:
         return ValidateResponse(valid=False)
+
+    token = creds.credentials
+
+    # Try JWT first (stateless, fast)
     try:
-        payload = decode_token(creds.credentials)
+        payload = decode_token(token)
+        role = payload["role"]
         return ValidateResponse(
             valid=True,
             user_id=int(payload["sub"]),
             username=payload["username"],
             display_name=payload.get("display_name"),
-            role=payload["role"],
+            role=role,
+            principal_type=payload.get("principal_type", "human"),
+            is_admin=(role == "admin"),
         )
     except (JWTError, KeyError, ValueError):
-        return ValidateResponse(valid=False)
+        pass
+
+    # Try API key (DB lookup — used by agents)
+    try:
+        result = await db.execute(
+            select(User).where(User.api_key == token, User.is_active == True)  # noqa: E712
+        )
+        user = result.scalar_one_or_none()
+        if user:
+            return ValidateResponse(
+                valid=True,
+                user_id=user.id,
+                username=user.username,
+                display_name=user.display_name,
+                role=user.role,
+                principal_type=user.principal_type,
+                is_admin=(user.role == "admin"),
+            )
+    except Exception:
+        pass
+
+    return ValidateResponse(valid=False)
 
 
 @router.get("/me", response_model=UserOut)

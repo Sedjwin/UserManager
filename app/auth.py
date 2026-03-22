@@ -15,7 +15,7 @@ from .models import User
 
 ALGORITHM = "HS256"
 
-ROLE_RANK = {"demo": 0, "free": 1, "paid": 2, "admin": 3}
+ROLE_RANK = {"demo": 0, "free": 1, "paid": 2, "agent": 2, "admin": 3}
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -32,11 +32,12 @@ def create_token(user: User) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=settings.token_expire_hours)
     return jwt.encode(
         {
-            "sub":          str(user.id),
-            "username":     user.username,
-            "display_name": user.display_name,
-            "role":         user.role,
-            "exp":          expire,
+            "sub":            str(user.id),
+            "username":       user.username,
+            "display_name":   user.display_name,
+            "role":           user.role,
+            "principal_type": user.principal_type,
+            "exp":            expire,
         },
         settings.secret_key,
         algorithm=ALGORITHM,

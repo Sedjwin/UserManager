@@ -18,6 +18,7 @@ async def seed_admin():
             hashed_password=hash_password(settings.admin_password),
             display_name="Administrator",
             role="admin",
+            principal_type="human",
         )
         db.add(admin)
         await db.commit()
