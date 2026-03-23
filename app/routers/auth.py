@@ -1,4 +1,4 @@
-"""Auth endpoints: login, validate, me."""
+"""Auth endpoints: login, validate, me, register."""
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..auth import create_token, decode_token, get_current_user, verify_password
+from ..auth import create_token, decode_token, get_current_user, hash_password, verify_password
 from ..database import get_db
 from ..models import User
 from ..schemas import TokenResponse, UserOut, ValidateResponse
@@ -22,6 +22,44 @@ _bearer = HTTPBearer(auto_error=False)
 class LoginBody(BaseModel):
     username: str
     password: str
+
+
+class RegisterBody(BaseModel):
+    username: str
+    password: str
+    display_name: Optional[str] = None
+
+
+@router.post("/register", response_model=TokenResponse, status_code=201)
+async def register(body: RegisterBody, db: AsyncSession = Depends(get_db)):
+    """Public self-registration — creates a 'free' role human user."""
+    if len(body.username) < 3:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Username must be at least 3 characters")
+    if len(body.password) < 8:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Password must be at least 8 characters")
+
+    existing = await db.execute(select(User).where(User.username == body.username))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status.HTTP_409_CONFLICT, "Username already taken")
+
+    user = User(
+        username=body.username,
+        hashed_password=hash_password(body.password),
+        display_name=body.display_name,
+        role="free",
+        principal_type="human",
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return TokenResponse(
+        access_token=create_token(user),
+        user_id=user.id,
+        username=user.username,
+        role=user.role,
+        principal_type=user.principal_type,
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
