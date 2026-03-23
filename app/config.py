@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Used by other services (AgentManager etc.) to create/delete agent principals
     service_key: str = "change-me-service-key"
 
+    # Comma-separated AgentManager UUIDs auto-granted to every new user on registration
+    default_agent_ids: str = ""
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

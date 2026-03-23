@@ -10,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import create_token, decode_token, get_current_user, hash_password, verify_password
+from ..config import settings
 from ..database import get_db
-from ..models import User
+from ..models import User, UserAgentGrant
 from ..schemas import TokenResponse, UserOut, ValidateResponse
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -52,6 +53,11 @@ async def register(body: RegisterBody, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    # Auto-grant default agents (e.g. Charon) to every new user
+    for agent_id in [a.strip() for a in settings.default_agent_ids.split(",") if a.strip()]:
+        db.add(UserAgentGrant(user_id=user.id, agent_id=agent_id))
+    await db.commit()
 
     return TokenResponse(
         access_token=create_token(user),

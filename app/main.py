@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .database import init_db, migrate_db
-from .routers import auth, users
-from .routers import internal
+from .routers import auth, users, internal
+from .routers import agent_grants
 from .seed import seed_admin
 
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -34,6 +34,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(internal.router)
+app.include_router(agent_grants.router)
 
 
 @app.get("/health")
