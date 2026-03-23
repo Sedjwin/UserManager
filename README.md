@@ -43,6 +43,7 @@ Set via environment variables or `.env` file:
 | `DATABASE_URL`        | `sqlite+aiosqlite:///./data/usermanager.db`      | Async SQLAlchemy connection    |
 | `HOST`                | `127.0.0.1`                                      | Bind address                   |
 | `PORT`                | `8005`                                           | Bind port                      |
+| `DEFAULT_AGENT_IDS`   | `""`                                             | Comma-separated AgentManager UUIDs auto-granted to every new user on registration |
 
 ---
 
@@ -50,12 +51,13 @@ Set via environment variables or `.env` file:
 
 ### Auth — `/auth`
 
-| Method | Path             | Auth            | Description                                      |
-|--------|------------------|-----------------|--------------------------------------------------|
-| POST   | `/auth/login`    | None            | Login → JWT token                                |
-| GET    | `/auth/validate` | Bearer (optional)| Validate token — used by other services          |
-| GET    | `/auth/me`       | Bearer required | Get current user's profile                       |
-| GET    | `/health`        | None            | Service health check                             |
+| Method | Path               | Auth             | Description                                      |
+|--------|--------------------|------------------|--------------------------------------------------|
+| POST   | `/auth/login`      | None             | Login → JWT token                                |
+| POST   | `/auth/register`   | None             | Public self-registration → JWT token (creates `free` user, auto-grants `DEFAULT_AGENT_IDS`) |
+| GET    | `/auth/validate`   | Bearer (optional)| Validate token — used by other services          |
+| GET    | `/auth/me`         | Bearer required  | Get current user's profile                       |
+| GET    | `/health`          | None             | Service health check                             |
 
 **Login request:**
 ```json
@@ -131,6 +133,38 @@ or on any error (expired, missing, invalid):
 
 ---
 
+**Register request:**
+```json
+{ "username": "alice", "password": "securepassword", "display_name": "Alice" }
+```
+
+Response is the same `TokenResponse` format as login. `DEFAULT_AGENT_IDS` are granted atomically at creation time.
+
+---
+
+### Agent Grants — `/users` (agent access control)
+
+Controls which AgentManager agents each user can access. Admin manages all grants; users can read their own.
+
+| Method | Path                                | Auth           | Description                                    |
+|--------|-------------------------------------|----------------|------------------------------------------------|
+| GET    | `/users/me/agents`                  | Bearer         | List current user's granted agent IDs          |
+| GET    | `/users/{id}/agents`                | Bearer + admin | List any user's granted agent IDs              |
+| POST   | `/users/{id}/agents`                | Bearer + admin | Grant an agent to a user                       |
+| DELETE | `/users/{id}/agents/{agent_id}`     | Bearer + admin | Revoke an agent grant                          |
+
+**Grant request:**
+```json
+{ "agent_id": "07255695-7f09-4907-922e-04168a483cd1" }
+```
+
+**`GET /users/me/agents` response:**
+```json
+["07255695-7f09-4907-922e-04168a483cd1", "other-agent-uuid"]
+```
+
+---
+
 ## Roles
 
 | Role    | Rank | Description             |
@@ -143,6 +177,15 @@ or on any error (expired, missing, invalid):
 ---
 
 ## Database Models
+
+### UserAgentGrant
+
+| Column       | Type     | Notes                                      |
+|--------------|----------|--------------------------------------------|
+| `id`         | int PK   | Auto-increment                             |
+| `user_id`    | int FK   | References `users.id` (CASCADE delete)     |
+| `agent_id`   | str(64)  | AgentManager UUID                          |
+| `granted_at` | datetime | Server-generated                           |
 
 ### User
 
